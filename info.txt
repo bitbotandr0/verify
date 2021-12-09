@@ -1,0 +1,402 @@
+
+# referencia tomada de red hat
+#https://access.redhat.com/articles/1200223
+#Vulnerabilidad de inyección de código Bash a través de variables de entorno especialmente diseñadas (CVE-2014-6271, CVE-2014-7169)
+
+#PARA SALIR DE AQUI PULSE ctrl+x
+ 
+
+Se ha informado a Red Hat de una vulnerabilidad que afecta a todas las versiones del paquete bash que se envía con los productos Red Hat. Esta vulnerabilidad CVE-2014-6271 podría permitir la ejecución de código arbitrario. Ciertos servicios y aplicaciones permiten que atacantes remotos no autenticados proporcionen variables de entorno, lo que les permite aprovechar este problema.
+
+Actualización: 2014-09-30 18:00 UTC
+
+Se han informado dos nuevas fallas que son mitigadas por los paquetes Bash disponibles actualmente. Consulte las preguntas frecuentes para obtener más información.
+
+Actualización: 2014-09-29 05:00 UTC
+
+Circula software malicioso que aprovecha esta vulnerabilidad. Para obtener más detalles, consulte este artículo .
+
+Actualización: 2014-09-26 05:15 UTC
+
+Red Hat se ha dado cuenta de que el parche para CVE-2014-6271 está incompleto. Un atacante puede proporcionar variables de entorno especialmente diseñadas que contienen comandos arbitrarios que se ejecutarán en sistemas vulnerables bajo ciertas condiciones. A la nueva emisión se le ha asignado CVE-2014-7169 .
+
+Los paquetes bash actualizados que se refieren a CVE-2014-7169 ahora están disponibles para Red Hat Enterprise Linux 4, 5, 6 y 7, Red Hat Enterprise Linux 5.6 Long Life, Red Hat Enterprise Linux 5.9 Extended Update Support, Red Hat Enterprise Linux 6.2 Advanced Update Support y Red Hat Enterprise Linux 6.4 Extended Update Support, y Shift_JIS para Red Hat Enterprise Linux 5 y 6. Consulte también Resolución para la vulnerabilidad de inyección de código Bash a través de variables de entorno especialmente diseñadas (CVE-2014-6271, CVE-2014-7169) en Red Hat Enterprise Linux .
+
+Pasos diagnósticos
+
+Red Hat Access Labs ha proporcionado un script para ayudar a confirmar si un sistema está parcheado contra la vulnerabilidad Shellshock. También puede probar manualmente su versión de Bash ejecutando el siguiente comando:
+
+$ env 'x = () {:;}; echo vulnerable '' BASH_FUNC_x () = () {:;}; echo vulnerable 'bash -c "prueba de eco" 
+
+Si la salida del comando anterior contiene una línea que contiene solo la palabra vulnerable, estás usando una versión vulnerable de Bash. El parche utilizado para solucionar este problema garantiza que no se permita ningún código después del final de una función Bash.
+
+Tenga en cuenta que las diferentes versiones de Bash también imprimirán diferentes advertencias al ejecutar el comando anterior. Las versiones de Bash sin ninguna corrección producen el siguiente resultado:
+
+$ env 'x = () {:;}; echo vulnerable '' BASH_FUNC_x () = () {:;}; echo vulnerable 'bash -c "prueba de eco" vulnerable bash: BASH_FUNC_x (): línea 0: error de sintaxis cerca del token inesperado `) ' bash: BASH_FUNC_x (): línea 0: `BASH_FUNC_x () () {:;}; eco vulnerable ' bash: error al importar la definición de función para `BASH_FUNC_x ' prueba 
+
+Las versiones con solo la corrección CVE-2014-6271 original aplicada producen el siguiente resultado:
+
+$ env 'x = () {:;}; echo vulnerable '' BASH_FUNC_x () = () {:;}; echo vulnerable 'bash -c "prueba de eco" bash: advertencia: x: ignorando el intento de definición de función bash: error al importar la definición de función para 'x' bash: error al importar la definición de función para `BASH_FUNC_x () ' prueba 
+
+Las versiones con correcciones adicionales de RHSA-2014: 1306 , RHSA-2014: 1311 y RHSA-2014: 1312 producen el siguiente resultado:
+
+$ env 'x = () {:;}; echo vulnerable '' BASH_FUNC_x () = () {:;}; echo vulnerable 'bash -c "prueba de eco" bash: advertencia: x: ignorando el intento de definición de función bash: error al importar la definición de función para `BASH_FUNC_x ' prueba 
+
+La diferencia en la salida se debe a cambios de procesamiento de funciones adicionales que se explican en la sección "Cómo afecta esto a los sistemas" a continuación.
+
+La solución para CVE-2014-7169 garantiza que el sistema esté protegido contra el problema de creación de archivos. Para probar si su versión de Bash es vulnerable a CVE-2014-7169, ejecute el siguiente comando:
+
+$ cd / tmp; rm -f / tmp / echo; env 'x = () {(a) => \' bash -c "fecha de eco"; cat / tmp / echo bash: x: línea 1: error de sintaxis cerca del token inesperado `= ' bash: x: línea 1: `' bash: error al importar la definición de función para 'x' 26 de septiembre de 2014 a las 11:49:58 GMT 
+
+Si su sistema es vulnerable, la información de fecha y hora aparecerá en la pantalla y se creará un archivo llamado / tmp / echo.
+
+Si su sistema no es vulnerable, verá un resultado similar a:
+
+$ cd / tmp; rm -f / tmp / echo; env 'x = () {(a) => \' bash -c "fecha de eco"; cat / tmp / echo fecha cat: / tmp / echo: No existe tal archivo o directorio 
+
+Si su sistema es vulnerable, puede solucionar estos problemas actualizando a la versión más reciente del paquete Bash ejecutando el siguiente comando:
+
+Crudo
+
+# yum update bash 
+
+¿Cómo afecta esto a los sistemas
+
+Este problema afecta a todos los productos que utilizan el shell Bash y analizan los valores de las variables de entorno. Este problema es especialmente peligroso ya que hay muchas formas posibles en que una aplicación puede llamar a Bash. Muy a menudo, si una aplicación ejecuta otro binario, se invoca Bash para lograrlo. Debido al uso generalizado del shell Bash, este problema es bastante grave y debe tratarse como tal.
+
+Todas las versiones anteriores a las enumeradas como actualizaciones para este problema son vulnerables hasta cierto punto.
+
+Consulte el artículo de corrección correspondiente para obtener más detalles.
+
+El parche para CVE-2014-7169 introduce cambios en la forma en que Bash evalúa las variables de entorno. Las aplicaciones que crean directamente funciones Bash como variables de entorno deben ser conscientes de estos cambios. Anteriormente, una función tenía que almacenarse en una variable de entorno con el mismo nombre. Por ejemplo, la función "calcular" se almacenaría en una variable de entorno denominada "calcular". Con el parche para CVE-2014-7169 aplicado, necesitaría usar el nombre "BASH_FUNC_compute ()". Como resultado, ahora hay dos pares de paréntesis en la cadena de entorno, como en "BASH_FUNC_compute () = () {}".
+
+Las funciones escritas en Bash no necesitan cambiarse, incluso si se exportan con "export -f". Bash aplicará de forma transparente la denominación adecuada al exportar y revertirá el proceso al importar definiciones de funciones.
+
+Los servicios que crean tales variables de entorno deberán reiniciarse para que funcionen con la nueva versión de Bash. Este comportamiento no es utilizado por ninguno de los paquetes proporcionados en ninguna versión de Red Hat Enterprise Linux.
+
+Productos afectados:
+
+Producto / CanalFijo en paqueteDetalles de la remediaciónRed Hat Enterprise Linux 7bash-4.2.45-5.el7_0.4Red Hat Enterprise LinuxRed Hat Enterprise Linux 6bash-4.1.2-15.el6_5.2Red Hat Enterprise Linuxbash-4.1.2-15.el6_5.1.sjis.2Red Hat Enterprise Linuxbash-4.1.2-9.el6_2.2Red Hat Enterprise Linux 6.2 AUSbash-4.1.2-15.el6_4.2Red Hat Enterprise Linux 6.4 EUSRed Hat Enterprise Linux 5bash-3.2-33.el5_11.4Red Hat Enterprise Linuxbash-3.2-33.el5_11.1.sjis.2Red Hat Enterprise Linuxbash-3.2-24.el5_6.2Red Hat Enterprise Linux 5.6 LLbash-3.2-32.el5_9.3Red Hat Enterprise Linux 5.9 EUSRed Hat Enterprise Linux 4bash-3.0-27.el4.4Red Hat Enterprise Linux 4
+
+Ejemplos de configuración comunes:
+
+Red Hat realizó un análisis para comprender mejor la magnitud de este problema y cómo afecta a varias configuraciones. La siguiente lista no es exhaustiva, pero pretende dar algunos ejemplos de cómo este problema afecta a ciertas configuraciones y por qué el alto nivel de complejidad hace que sea imposible especificar algo que no se vea afectado por este problema. El mejor curso de acción es actualizar Bash a una versión fija.
+
+PaqueteDescripciónhttpdEs probable que los scripts CGI se vean afectados por este problema: cuando el servidor web ejecuta un script CGI, utiliza variables de entorno para pasar datos al script. El atacante puede controlar estas variables de entorno. Si el script CGI llama a Bash, el script podría ejecutar código arbitrario como el usuario httpd. mod_php, mod_perl y mod_python no usan variables de entorno y creemos que no se ven afectadas.Shell seguro (SSH)No es raro restringir los comandos remotos que un usuario puede ejecutar a través de SSH, como rsync o git. En estos casos, este problema se puede utilizar para ejecutar cualquier comando, no solo el comando restringido.dhclientEl cliente de protocolo de configuración dinámica de host (dhclient) se utiliza para obtener automáticamente información de configuración de red a través de DHCP. Este cliente utiliza varias variables de entorno y ejecuta Bash para configurar la interfaz de red. La conexión a un servidor DHCP malintencionado podría permitir a un atacante ejecutar código arbitrario en la máquina cliente.TAZASSe cree que CUPS se ve afectado por este problema. Varios valores proporcionados por el usuario se almacenan en variables de entorno cuando se ejecutan los filtros de tazas.sudoLos comandos que se ejecutan a través de sudo no se ven afectados por este problema. Sudo busca específicamente variables de entorno que también sean funciones. Todavía podría ser posible que el comando en ejecución establezca una variable de entorno que podría hacer que un proceso hijo de Bash ejecute código arbitrario.FirefoxNo creemos que se pueda obligar a Firefox a establecer una variable de entorno de una manera que permita a Bash ejecutar comandos arbitrarios. Aún es recomendable actualizar Bash ya que es común instalar varios complementos y extensiones que podrían permitir este comportamiento.SufijoEl servidor Postfix reemplazará varios caracteres con?. Si bien el servidor Postfix llama a Bash de varias formas, no creemos que el servidor pueda establecer una variable de entorno arbitraria. Sin embargo, es posible que un filtro pueda establecer variables de entorno.
+
+Un análisis más detallado de la falla está disponible en: https://securityblog.redhat.com/2014/09/24/bash-specially-crafted-environment-variables-code-injection-attack
+
+Preguntas frecuentes
+
+Estas preguntas frecuentes son para la vulnerabilidad CVE-2014-6271 en Bash.
+
+Alguna información adicional sobre CVE-2014-6271 y CVE-2014-7169 está disponible en: https://securityblog.redhat.com/2014/09/26/frequency-asked-questions-about-the-shellshock-bash-flaws /
+
+En https://access.redhat.com/discussions/1211573 se encuentra disponible información adicional sobre los clientes que tienen derechos RHEL 4 Standard o Premium, pero no ELS.
+
+¿Por qué hay seis asignaciones CVE?
+
+
+Al defecto original en Bash se le asignó CVE-2014-6271 . Poco después de que este problema se hiciera público, un investigador encontró una falla similar que no fue bloqueada por la primera solución y se le asignó CVE-2014-7169 . Más tarde, el investigador de seguridad de productos de Red Hat, Florian Weimer, encontró problemas adicionales y se les asignó CVE-2014-7186 y CVE-2014-7187 . Recientemente, se informaron dos fallas más, aunque los detalles de estas fallas actualmente no son públicos, y se les asignó CVE-2014-6277 y CVE-2014-6278. Las primeras cuatro fallas se han corregido en los últimos paquetes de Bash disponibles actualmente, y las dos últimas fallas se mitigan con las mismas. Al momento de escribir este artículo (2014-09-30), actualmente no hay fallas de seguridad conocidas a las que estos paquetes Bash sean vulnerables. Consulte las páginas CVE reales indicadas para conocer las últimas declaraciones sobre estos defectos.
+
+Creo que mi sistema puede haberse visto comprometido debido a esta vulnerabilidad, ¿qué debo hacer?
+
+Si ha ejecutado los pasos de diagnóstico de este artículo y su sistema aún parece vulnerable, o cree que su sistema se ha visto comprometido, abra un caso de soporte con Red Hat o comuníquese con el soporte de Red Hat por teléfono .
+
+¿Necesito reiniciar o reiniciar los servicios después de instalar la actualización para CVE-2014-6271 y CVE-2014-7169?
+
+Si su sistema utiliza funciones Bash exportadas, se recomienda reiniciar los servicios afectados. Es posible que los usuarios interactivos afectados deban volver a iniciar sesión y que las sesiones de pantalla o tmux deban reiniciarse.
+
+La actualización de Bash proporcionada para solucionar estos problemas cambia los nombres de las funciones exportadas en el entorno. Si la versión anterior de Bash exporta una función, los procesos de Bash recién iniciados no la reconocen después de la actualización y, en esencia, se vuelve indefinida. Reiniciar los servicios asegura que la nueva versión de Bash exporta funciones bajo el nombre esperado, haciéndola visible nuevamente.
+
+Para saber qué servicios deben reiniciarse (o qué usuarios deben volver a iniciar sesión), ejecute el siguiente comando después de la actualización:
+
+$ grep -l -z '[^)] = () {' / proc / [1-9] * / environment | cortar -d / -f3
+
+Los PID devueltos pertenecen a procesos que utilizan las antiguas definiciones de funciones exportadas en su entorno. Estos procesos deben reiniciarse. Para descubrir qué servicio inició un determinado PID y necesita reiniciarse, en Red Hat Enterprise Linux 7, use el siguiente comando:
+
+$ systemctl status <PID>
+
+En Red Hat Enterprise Linux 6 y versiones anteriores, use el comando pstree -po ps -axufy busque un PID en particular.
+
+¿Son otras conchas vulnerables a este problema?
+
+Red Hat ha probado otros shells para este problema. No pudimos reproducir el comportamiento visto en Bash. Si se descubren problemas similares en otros shells, publicaremos actualizaciones según corresponda.
+
+¿Existen posibles mitigaciones contra este problema?
+
+Consulte Mitigación de la vulnerabilidad shellshock (CVE-2014-6271 y CVE-2014-7169) para obtener detalles sobre posibles mitigaciones si no puede instalar los paquetes actualizados. La mejor mitigación es instalar los últimos paquetes disponibles (mencionados anteriormente), ya que actualmente protegen contra todas las vulnerabilidades informadas.
+
+Declaración sobre la vulnerabilidad del sitio web de Red Hat
+
+Se ha confirmado que los siguientes sitios web de Red Hat, que brindan servicios a los clientes, están actualizados:
+
+www.redhat.com
+
+access.redhat.com (Portal del cliente de Red Hat)
+
+rhn.redhat.com (Red Hat Network)
+
+Red Hat utiliza Salesforce para brindar servicios a los clientes. Salesforce ha publicado un comunicado en el que ha determinado que los servicios de Salesforce no son vulnerables a este problema.
+
+Red Hat ha observado intentos fallidos de aprovechar esta vulnerabilidad en los sitios web mencionados anteriormente. Continuamos monitoreando nuestros sistemas para asegurar su confidencialidad, integridad y disponibilidad.
+
+Producto (s)
+
+ 
+
+Red Hat Enterprise Linux
+
+Categoría
+
+ 
+
+Seguro
+
+Componente
+
+ 
+
+intento
+
+Etiquetas
+
+ 
+
+labs_shellshock
+
+ 
+
+seguridad
+
+ 
+
+Vulnerabilidades de seguridad
+
+Tipo de artículo
+
+ 
+
+General
+
+86 comentarios
+
+INICIA SESIÓN PARA COMENTAR
+
+TSMIEMBRO DE LA COMUNIDAD24 Puntos
+
+24 de septiembre de 2014 17:25
+
+Servicios técnicos
+
+¿Cuándo estará disponible bash-4.1.2-15.el6_4.1?
+
+￼SOMBRERO ROJOGURÚ3376 Puntos
+
+24 de septiembre de 2014 7:40 p.m.
+
+Bryan Totty
+
+Debería estar disponible ahora:
+
+# yum update bash
+
+4.1.2-15.el6_5.1
+
+CWNOVATO7 Puntos
+
+24 de septiembre de 2014 18:29
+
+Chris Williams
+
+Linux 2.6.32-431.29.2.el6.x86_64 # 1 SMP Dom 27 de julio 15:55:46 EDT 2014 x86_64 x86_64 x86_64 GNU / Linux No puedo obtener una actualización ¿qué pasa con eso?
+
+cat / etc / redhat-release
+Red Hat Enterprise Linux Server versión 6.5 (Santiago)
+
+￼SOMBRERO ROJOGURÚ3376 Puntos
+
+24 de septiembre de 2014 19:41
+
+Bryan Totty
+
+Debería estar disponible ahora:
+
+# yum update bash
+
+4.1.2-15.el6_5.1
+
+MFMIEMBRO DE LA COMUNIDAD24 Puntos
+
+24 de septiembre de 2014 20:26
+
+Marc Fromm
+
+Acabo de probar yum update bash e informa que no hay paquetes marcados para actualizar.
+
+FDSOMBRERO ROJOGURÚ1454 Puntos
+
+26 de septiembre de 2014 4:37 PM
+
+Felix Dewaleyne
+
+para asegurarse de que su yum no esté usando un caché antiguo, puede usarlo yum clean alle intentarlo de nuevo. si no, puede presentar un caso en https://access.redhat.com/support/cases/
+
+ESONOVATO10 Puntos
+
+24 de septiembre de 2014 19:48
+
+Isaac Traxler
+
+¿Cómo consigo que mi servidor satélite elimine estas actualizaciones?
+
+WISCONSINNOVATO15 Puntos
+
+24 de septiembre de 2014 20:26
+
+Willie-obs
+
+Ejecute el siguiente comando:
+[root @ satserver ~] # satellite-sync
+
+BRNOVATO18 Puntos
+
+24 de septiembre de 2014 19:53
+
+Brad.hudson
+
+¿Se ha informado de este problema a Oracle? También parece ser un problema en las versiones Solaris (sparc y x86) de bash.
+
+￼SOMBRERO ROJOGURÚ3376 Puntos
+
+25 de septiembre de 2014 19:07
+
+Bryan Totty
+
+Oracle tomará las medidas que considere oportunas. Red Hat no archiva informes CVE y parches a Oracle.
+
+DHNOVATO5 Puntos
+
+24 de septiembre de 2014 20:19
+
+dhabgoodiii
+
+Las distribuciones de Linux basadas en Debian también son vulnerables.
+
+MFMIEMBRO DE LA COMUNIDAD24 Puntos
+
+24 de septiembre de 2014 20:21
+
+Marc Fromm
+
+Mi versión (bash-3.2-32.el5_9.1) se informa como vulnerable, pero la actualización de yum indica que no hay ninguna actualización disponible para bash.
+
+$ env x = '() {:;}; echo vulnerable 'bash -c "echo esto es una prueba"
+vulnerable
+esta es una prueba
+
+$ sudo yum update bash
+Complementos cargados: rhnplugin, seguridad
+Este sistema está recibiendo actualizaciones de RHN Classic o RHN Satellite.
+Omitiendo el complemento de seguridad, sin datos
+Configuración del proceso de actualización
+No hay paquetes marcados para actualización
+
+WISCONSINNOVATO15 Puntos
+
+24 de septiembre de 2014 20:26
+
+Willie-obs
+
+Primero ejecute:
+yum clean all
+Luego ejecute:
+yum update bash
+
+MFMIEMBRO DE LA COMUNIDAD24 Puntos
+
+24 de septiembre de 2014 20:32
+
+Marc Fromm
+
+todavía no hay paquetes marcados para actualizar después de ejecutar
+yum clean all.
+
+￼SOMBRERO ROJOMIEMBRO DE LA COMUNIDAD36 Puntos
+
+25 de septiembre de 2014 18:08
+
+Thomas Cameron
+
+¿Está instalando desde un servidor satélite? Si es así, el servidor satélite necesita obtener la actualización de Red Hat.
+
+Como root, en el servidor Satellite, ejecute Satellite-sync.
+
+￼SOMBRERO ROJOMIEMBRO DE LA COMUNIDAD36 Puntos
+
+25 de septiembre de 2014 18:09
+
+Thomas Cameron
+
+O obtenga manualmente de https://rhn.redhat.com/rhn/errata/details/Packages.do?eid=27888
+
+KVNOVATO10 Puntos
+
+24 de septiembre de 2014 20:29
+
+Kris Voelker
+
+Estoy ejecutando una versión vulnerable pero tampoco recibo actualizaciones disponibles cuando ejecuto yum. ¿Cuándo estará disponible bash-3.2-33.el5.1?
+
+ANTES DE CRISTOMIEMBRO DE LA COMUNIDAD64 Puntos
+
+24 de septiembre de 2014 20:35
+
+Blayne Campbell
+
+Puede encontrar un rpm disponible aquí:
+https://rhn.redhat.com/rhn/errata/details/Packages.do?eid=27888
+
+RMNOVATO13 Puntos
+
+24 de septiembre de 2014 20:33
+
+Rajasekar Muthusamy
+
+mi versión también es vulnerable, pero no puedo actualizar el bash
+
+Ejecutando Transaction
+bash-4.1.2-15.el6_5.1.x86_64 se suponía que estaba instalado pero no lo está.
+Verificando:
+se suponía que bash-4.1.2-15.el6_5.1.x86_64 1/2 bash-4.1.2-15.el6_4.x86_64 debía eliminarse, ¡pero no lo es!
+Verificando: bash-4.1.2-15.el6_4.x86_64 2/2
+Verificando: bash-4.1.2-15.el6_5.1.x86_64 3/2
+
+Falló:
+bash.x86_64 0: 4.1.2-15.el6_4 bash.x86_64 0: 4.1.2-15.el6_5.1
+
+¡Completo!
+
+￼SOMBRERO ROJOGURÚ3376 Puntos
+
+27 de septiembre de 2014 15:14
+
+Bryan Totty
+
+Vuelva a intentarlo, ya que hemos realizado varios cambios y más actualizaciones en los últimos días. Si aún necesita ayuda, abra un caso de soporte con el soporte de Red Hat.
+
+MPNOVATO10 Puntos
+
+24 de septiembre de 2014 20:37
+
+Matthew Peters
+
+¿Alguna posibilidad de actualizar la (s) página (s) de descargas de redhat.com para que las versiones parcheadas sean las "más recientes" pronto?
+
+￼SOMBRERO ROJOGURÚ3376 Puntos
+
+25 de septiembre de 2014 19:10
+
+Bryan Totty
+
+El parche bash para CVE-
